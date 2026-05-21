@@ -1,0 +1,52 @@
+name: Build and deploy to Azure Container Apps
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in to Azure Container Registry
+        run: |
+          az acr login --name ${{ secrets.ACR_NAME }}
+
+      - name: Build Docker image from src/
+        run: |
+          docker build \
+            -f src/Dockerfile \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/${{ secrets.IMAGE_REPOSITORY }}:${{ github.sha }} \
+            src
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ secrets.ACR_LOGIN_SERVER }}/${{ secrets.IMAGE_REPOSITORY }}:${{ github.sha }}
+
+      - name: Update Azure Container App image and environment variables
+        run: |
+          az containerapp update \
+            --name ${{ secrets.CONTAINER_APP_NAME }} \
+            --resource-group ${{ secrets.RESOURCE_GROUP }} \
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/${{ secrets.IMAGE_REPOSITORY }}:${{ github.sha }} \
+            --set-env-vars \
+              FOUNDRY_ENDPOINT=${{ secrets.FOUNDRY_ENDPOINT }} \
+              gpt_endpoint=${{ secrets.gpt_endpoint }} \
+              embedding_endpoint=${{ secrets.embedding_endpoint }} \
+              phi_4_endpoint=${{ secrets.phi_4_endpoint }}

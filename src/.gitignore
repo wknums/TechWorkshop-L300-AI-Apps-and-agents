@@ -57,3 +57,5 @@ out/
 
 # Github
 .github/
+
+.deploy2az.sh

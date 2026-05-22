@@ -44,6 +44,7 @@ out/
 # Misc
 *.swp
 *.swo
+.deploy2az.sh
 
 # Secret files
 .env

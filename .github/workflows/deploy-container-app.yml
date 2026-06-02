@@ -24,9 +24,38 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Login via Azure CLI
-        uses: azure/login@v2.1.1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t AZURE_LOGIN_VALUES < <(
+            python3 - <<'PY'
+            import json
+            import os
+            import sys
+
+            creds = json.loads(os.environ["AZURE_CREDENTIALS"])
+            values = [
+                creds.get("clientId") or creds.get("appId"),
+                creds.get("clientSecret") or creds.get("password"),
+                creds.get("tenantId") or creds.get("tenant"),
+                creds.get("subscriptionId") or creds.get("subscription"),
+            ]
+
+            if not all(values):
+                sys.exit("AZURE_CREDENTIALS is missing one or more required Azure service principal fields.")
+
+            print("\n".join(values))
+            PY
+          )
+
+          az login --service-principal \
+            --username "${AZURE_LOGIN_VALUES[0]}" \
+            --password "${AZURE_LOGIN_VALUES[1]}" \
+            --tenant "${AZURE_LOGIN_VALUES[2]}" \
+            --output none
+          az account set --subscription "${AZURE_LOGIN_VALUES[3]}"
 
       - name: Log in to Azure Container Registry
         run: |
